@@ -1,5 +1,7 @@
 # postech-identidade-service
 
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=postech4_postech-identidade-service&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=postech4_postech-identidade-service) [![Cobertura](https://sonarcloud.io/api/project_badges/measure?project=postech4_postech-identidade-service&metric=coverage)](https://sonarcloud.io/summary/new_code?id=postech4_postech-identidade-service) [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=postech4_postech-identidade-service&metric=bugs)](https://sonarcloud.io/summary/new_code?id=postech4_postech-identidade-service) [![Vulnerabilidades](https://sonarcloud.io/api/project_badges/measure?project=postech4_postech-identidade-service&metric=vulnerabilities)](https://sonarcloud.io/summary/new_code?id=postech4_postech-identidade-service) [![CI/CD](https://github.com/Gustavollier/postech-identidade-service/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/Gustavollier/postech-identidade-service/actions/workflows/ci-cd.yml)
+
 Microsserviço de **Identidade** do Tech Challenge Fase 4 (FIAP 13SOAT).
 
 Dono dos clientes, dos veículos, dos funcionários e do login da equipe.
