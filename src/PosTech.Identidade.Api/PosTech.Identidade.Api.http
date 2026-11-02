@@ -1,0 +1,40 @@
+@host = http://localhost:5042
+
+### Cadastrar cliente (CPF ou CNPJ, com ou sem pontuação)
+POST {{host}}/api/v1/clientes
+Content-Type: application/json
+
+{ "cpf": "529.982.247-25", "nomeCompleto": "Ana Prado", "telefone": "11999990000", "email": "ana@oficina.test" }
+
+### Buscar pelo documento
+GET {{host}}/api/v1/clientes/busca?documento=52998224725
+
+### Listar, paginado
+GET {{host}}/api/v1/clientes?pagina=1&tamanho=20
+
+### Cadastrar veículo
+POST {{host}}/api/v1/veiculos
+Content-Type: application/json
+
+{ "clienteId": 1, "marca": "VW", "modelo": "Gol", "placa": "abc-1d23", "cor": "Prata", "anoModelo": 2022, "anoFabricacao": 2021, "kmEntrada": 42000 }
+
+### Veículos do cliente
+GET {{host}}/api/v1/clientes/1/veiculos
+
+### Cadastrar funcionário
+POST {{host}}/api/v1/funcionarios
+Content-Type: application/json
+
+{ "nome": "Bruno Lima", "cpf": "11144477735", "cargo": "Mecanico", "valorHora": 85.50, "senha": "Oficina@2026" }
+
+### Login
+POST {{host}}/api/v1/autenticacao/login
+Content-Type: application/json
+
+{ "cpf": "11144477735", "senha": "Oficina@2026" }
+
+### Trocar senha
+POST {{host}}/api/v1/autenticacao/trocar-senha
+Content-Type: application/json
+
+{ "cpf": "11144477735", "senhaAtual": "Oficina@2026", "novaSenha": "Nova@Senha2026" }
