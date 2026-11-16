@@ -1,15 +1,19 @@
 # Build e publicação em estágios: a imagem final não carrega o SDK.
-FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+# O build roda na arquitetura de QUEM constrói e compila para a de DESTINO.
+# Sem o --platform, gerar uma imagem arm64 num runner amd64 cairia em emulação
+# QEMU e o publish passaria de dezenas de minutos.
+FROM --platform=$BUILDPLATFORM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+ARG TARGETARCH
 WORKDIR /src
 
 # Os .csproj primeiro, sozinhos: o restore vira camada de cache e só refaz
 # quando uma dependência muda, não a cada alteração de código.
 COPY src/PosTech.Identidade/*.csproj src/PosTech.Identidade/
 COPY src/PosTech.Identidade.Api/*.csproj src/PosTech.Identidade.Api/
-RUN dotnet restore src/PosTech.Identidade.Api/PosTech.Identidade.Api.csproj
+RUN dotnet restore src/PosTech.Identidade.Api/PosTech.Identidade.Api.csproj -a $TARGETARCH
 
 COPY src/ src/
-RUN dotnet publish src/PosTech.Identidade.Api/PosTech.Identidade.Api.csproj -c Release -o /app --no-restore
+RUN dotnet publish src/PosTech.Identidade.Api/PosTech.Identidade.Api.csproj -c Release -o /app --no-restore -a $TARGETARCH
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
