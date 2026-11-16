@@ -27,7 +27,11 @@ public sealed class AmbienteDaIdentidade : IAsyncLifetime
 
     public string ConnectionString { get; private set; } = string.Empty;
 
-    public HttpClient Cliente() => Fabrica.CreateClient();
+    /// <summary>
+    /// Por padrão quem chama é um gerente: o que os testes de cadastro querem
+    /// exercitar é o serviço, não a recusa. Quem testa acesso troca com Como().
+    /// </summary>
+    public HttpClient Cliente() => Fabrica.CreateClient().Como(TokenDeTeste.Gerente());
 
     public async Task InitializeAsync()
     {

@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
 
+using PosTech.Seguranca;
+
 namespace PosTech.Identidade.Api.Controllers;
 
 /// <summary>
@@ -38,6 +40,7 @@ public sealed record AtualizarClienteRequest(string? NomeCompleto, string? Telef
 /// </summary>
 [ApiController]
 [Route("api/v1/clientes")]
+[Exige(Perfil.Equipe)]
 public sealed class ClientesController(Cadastro cadastro, IClienteRepositorio clientes, IVeiculoRepositorio veiculos)
     : ControllerBase
 {
@@ -71,10 +74,16 @@ public sealed class ClientesController(Cadastro cadastro, IClienteRepositorio cl
     }
 
     [HttpGet("{id:int}")]
+    [Exige(Perfil.Autenticado)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Obter(int id, CancellationToken cancellationToken)
     {
+        // O cliente lê o próprio cadastro e mais nenhum. O de outro responde
+        // como inexistente, para o id não servir de sonda.
+        if (!QuemChama.De(HttpContext).PodeVerDadosDoCliente(id))
+            return NotFound();
+
         var cliente = await clientes.ObterAsync(id, cancellationToken);
 
         return cliente is null ? NotFound() : Ok(Mapear(cliente));
@@ -93,6 +102,7 @@ public sealed class ClientesController(Cadastro cadastro, IClienteRepositorio cl
     }
 
     [HttpPut("{id:int}")]
+    [Exige(Perfil.Gerente)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -105,16 +115,21 @@ public sealed class ClientesController(Cadastro cadastro, IClienteRepositorio cl
     }
 
     [HttpDelete("{id:int}")]
+    [Exige(Perfil.Gerente)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Desativar(int id, CancellationToken cancellationToken) =>
         await clientes.DesativarAsync(id, cancellationToken) ? NoContent() : NotFound();
 
     [HttpGet("{id:int}/veiculos")]
+    [Exige(Perfil.Autenticado)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Veiculos(int id, CancellationToken cancellationToken)
     {
+        if (!QuemChama.De(HttpContext).PodeVerDadosDoCliente(id))
+            return NotFound();
+
         if (await clientes.ObterAsync(id, cancellationToken) is null)
             return NotFound();
 
@@ -138,6 +153,7 @@ public sealed class ClientesController(Cadastro cadastro, IClienteRepositorio cl
 
 [ApiController]
 [Route("api/v1/veiculos")]
+[Exige(Perfil.Equipe)]
 public sealed class VeiculosController(Cadastro cadastro, IVeiculoRepositorio veiculos) : ControllerBase
 {
     [HttpPost]
@@ -153,16 +169,21 @@ public sealed class VeiculosController(Cadastro cadastro, IVeiculoRepositorio ve
     }
 
     [HttpGet("{id:int}")]
+    [Exige(Perfil.Autenticado)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Obter(int id, CancellationToken cancellationToken)
     {
         var veiculo = await veiculos.ObterAsync(id, cancellationToken);
 
-        return veiculo is null ? NotFound() : Ok(Mapear(veiculo));
+        if (veiculo is null || !QuemChama.De(HttpContext).PodeVerDadosDoCliente(veiculo.ClienteId))
+            return NotFound();
+
+        return Ok(Mapear(veiculo));
     }
 
     [HttpPut("{id:int}")]
+    [Exige(Perfil.Gerente)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -170,6 +191,7 @@ public sealed class VeiculosController(Cadastro cadastro, IVeiculoRepositorio ve
         Ok(Mapear(await cadastro.AtualizarVeiculoAsync(id, corpo, cancellationToken)));
 
     [HttpDelete("{id:int}")]
+    [Exige(Perfil.Gerente)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Desativar(int id, CancellationToken cancellationToken) =>
@@ -196,23 +218,43 @@ public sealed class VeiculosController(Cadastro cadastro, IVeiculoRepositorio ve
 [Route("api/v1/funcionarios")]
 public sealed class FuncionariosController(Cadastro cadastro, IFuncionarioRepositorio funcionarios) : ControllerBase
 {
+    /// <summary>
+    /// Cadastra um funcionário. É escrita de gerente, com uma exceção: o
+    /// primeiro. Num ambiente novo ainda não existe gerente para se autenticar,
+    /// então enquanto a equipe estiver vazia a rota aceita a chamada sem token
+    /// — é o passo de preparação do ambiente. Depois do primeiro cadastro a
+    /// porta fecha sozinha.
+    /// </summary>
     [HttpPost]
     [ProducesResponseType(StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    [ProducesResponseType(StatusCodes.Status403Forbidden)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
     public async Task<IActionResult> Cadastrar([FromBody] NovoFuncionario corpo, CancellationToken cancellationToken)
     {
+        var quem = QuemChama.De(HttpContext);
+
+        if (!quem.EhGerente && (await funcionarios.ListarAsync(cancellationToken)).Any())
+        {
+            return quem.Autenticado
+                ? StatusCode(StatusCodes.Status403Forbidden, new { erro = "Só o gerente cadastra funcionários." })
+                : StatusCode(StatusCodes.Status401Unauthorized, new { erro = "Token ausente, inválido ou vencido." });
+        }
+
         var funcionario = await cadastro.CadastrarFuncionarioAsync(corpo, cancellationToken);
 
         return CreatedAtAction(nameof(Obter), new { id = funcionario.Id }, Mapear(funcionario));
     }
 
     [HttpGet]
+    [Exige(Perfil.Equipe)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     public async Task<IActionResult> Listar(CancellationToken cancellationToken) =>
         Ok((await funcionarios.ListarAsync(cancellationToken)).Select(Mapear));
 
     [HttpGet("{id:int}")]
+    [Exige(Perfil.Equipe)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Obter(int id, CancellationToken cancellationToken)
@@ -223,6 +265,7 @@ public sealed class FuncionariosController(Cadastro cadastro, IFuncionarioReposi
     }
 
     [HttpPut("{id:int}")]
+    [Exige(Perfil.Gerente)]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -230,6 +273,7 @@ public sealed class FuncionariosController(Cadastro cadastro, IFuncionarioReposi
         Ok(Mapear(await cadastro.AtualizarFuncionarioAsync(id, corpo, cancellationToken)));
 
     [HttpDelete("{id:int}")]
+    [Exige(Perfil.Gerente)]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     public async Task<IActionResult> Desativar(int id, CancellationToken cancellationToken) =>
