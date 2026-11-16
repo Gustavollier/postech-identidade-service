@@ -96,6 +96,22 @@ Swagger em `/swagger`. Exemplos em [`PosTech.Identidade.Api.http`](src/PosTech.I
 Os erros de negócio são traduzidos num lugar só (`TradutorDeErros`): dado
 inválido é `400`, inexistente é `404`, duplicado é `409`.
 
+## Quem pode o quê
+
+O gateway valida o token; o serviço decide o que cada perfil alcança, lendo `role` e `ClienteId` do JWT repassado (`src/PosTech.Identidade.Api/Acesso.cs`).
+
+| O quê | Gerente | Demais cargos | Cliente |
+|---|---|---|---|
+| Listar e buscar clientes, cadastrar cliente e veículo | sim | sim | não (403) |
+| Ler um cliente, seus veículos, ou um veículo | sim | sim | só os próprios; os de outro respondem 404 |
+| Editar e desativar cliente ou veículo | sim | não (403) | não (403) |
+| Consultar a equipe | sim | sim | não (403) |
+| Cadastrar, editar e desativar funcionário | sim | não (403) | não (403) |
+
+Sem token, 401. Login, troca de senha e `/health` continuam públicos.
+
+**O primeiro funcionário.** Num ambiente novo não existe gerente para se autenticar, então `POST /funcionarios` aceita chamada sem token enquanto a equipe estiver vazia. Depois do primeiro cadastro, a porta fecha sozinha.
+
 ## Rodar local
 
 ```bash
